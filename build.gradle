@@ -1,0 +1,220 @@
+/* ========================
+ * Build
+ * ========================
+ */
+
+buildscript {
+	ext {
+		gradleScriptDir = "${rootProject.projectDir}/gradle"
+		cfAppVersion = '2.0.0-RC1'
+
+		springCloudServicesVersion = '1.5.0.RELEASE'
+		springCloudVersion = 'Dalston.SR4'
+		springBootVersion = '1.5.8.RELEASE'
+	}
+
+	apply from: "$gradleScriptDir/repositoriesBuildScript.gradle", to: buildscript
+
+	repositories {
+		mavenCentral()
+		maven { url "http://repo.spring.io/plugins-release" }
+		maven { url "http://repo.spring.io/milestone" }
+		maven { url "https://plugins.gradle.org/m2/" }
+		maven { url "https://repo.spring.io/snapshot" }
+	}
+
+	dependencies {
+		classpath'org.ajoberstar:grgit:2.2.1-rc.2'
+		classpath "org.sonarsource.scanner.gradle:sonarqube-gradle-plugin:2.5"
+		classpath "net.ltgt.gradle:gradle-apt-plugin:0.9"
+		classpath "org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}"
+		classpath "org.springframework.build.gradle:propdeps-plugin:0.0.7"
+		classpath "com.moowork.gradle:gradle-node-plugin:1.2.0"
+		classpath "io.spring.gradle:dependency-management-plugin:0.6.1.RELEASE"
+		classpath "org.jfrog.buildinfo:build-info-extractor-gradle:latest.release"
+		classpath 'org.asciidoctor:asciidoctor-gradle-plugin:1.5.3'
+		classpath 'org.asciidoctor:asciidoctorj-pdf:1.5.0-alpha.14'
+		classpath 'io.github.swagger2markup:swagger2markup-gradle-plugin:1.3.1'
+		classpath 'io.github.swagger2markup:swagger2markup-spring-restdocs-ext:1.3.1'
+		classpath 'com.mbusa.cd.gradle.plugins:versioning:1.0.7'
+		classpath("com.github.pivotalservices:ya-cf-app-gradle-plugin:${cfAppVersion}")
+
+	}
+}
+
+/* ========================
+ * Plugins
+ * ========================
+ */
+
+plugins {
+	id 'org.springframework.boot' version '1.5.8.RELEASE'
+}
+
+apply plugin: "java"
+apply plugin: "idea"
+apply plugin: 'eclipse'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'propdeps'
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'com.jfrog.artifactory'
+apply plugin: 'maven-publish'
+apply plugin: 'cf-app'
+apply plugin: 'com.mbusa.cd.gradle.plugins.versioning'
+apply from: "$gradleScriptDir/cf.gradle"
+apply from: "$gradleScriptDir/sonar.gradle"
+
+/* ========================
+ * Project Info
+ * ========================
+ */
+
+group = 'com.mb.oneweb'
+description = "MB Inventory Service"
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+tasks.withType(JavaCompile) {
+	options.encoding = 'UTF-8'
+}
+
+/* ========================
+ * Project Properties
+ * ========================
+ */
+
+ext {
+	//define versioning here and in JenkinsFile-->appJarName
+	major = 1
+	minor = 0
+
+	// Open the Git repository in the current directory.
+	git = org.ajoberstar.grgit.Grgit.open(currentDir: file('.'))
+	revision = git.head().abbreviatedId
+	fullRevision = git.head().id
+	buildDate = new Date();
+	branch = git.branch.current.name
+	cfAppVersion = '2.0.0-RC1'
+}
+
+/* ========================
+ * Dependencies
+ * ========================
+ */
+
+repositories {
+	mavenCentral()
+	maven { url "http://repo.spring.io/plugins-release" }
+	maven { url "http://repo.spring.io/milestone" }
+	maven { url "https://plugins.gradle.org/m2/" }
+	maven { url "https://repo.spring.io/snapshot" }
+
+	// Needed to access legacy version of DB2. TODO: remove when moving to new DB  
+	maven { url "http://mbusa-devops.usfdc.corpintra.net/repo" }
+
+	maven { url 'https://repo.spring.io/libs-release' }
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "io.pivotal.spring.cloud:spring-cloud-services-dependencies:${springCloudServicesVersion}"
+		mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+		mavenBom "org.springframework.boot:spring-boot-dependencies:${springBootVersion}"
+	}
+}
+
+dependencies {
+	// Spring Boot
+	compile('org.springframework.boot:spring-boot-starter-actuator')
+	compile('org.springframework.boot:spring-boot-starter-jersey')
+	compile('org.springframework.boot:spring-boot-starter-cache')
+	compile('org.springframework.boot:spring-boot-starter-web')
+	compile("org.springframework.boot:spring-boot-devtools")
+	//compile("org.springframework.boot:spring-boot-starter-data-jpa")
+	compile("org.springframework.boot:spring-boot-starter-jdbc")
+
+	// Spring Cloud
+	compile('org.springframework.cloud:spring-cloud-starter-eureka')
+	compile('org.springframework.cloud:spring-cloud-starter-hystrix')
+	compile('org.springframework.cloud:spring-cloud-cloudfoundry-connector')
+	compile("org.springframework.cloud:spring-cloud-starter-feign")
+	compile("org.springframework.cloud:spring-cloud-cloudfoundry-connector")
+	compile("org.springframework.data:spring-data-geode:1.0.0.INCUBATING-RELEASE")
+
+	// Pivotal (PCF)
+	compile('io.pivotal.spring.cloud:spring-cloud-services-starter-service-registry')
+	compile("io.pivotal.spring.cloud:spring-cloud-services-starter-config-client")
+	compile("io.pivotal.spring.cloud:spring-cloud-gemfire-cloudfoundry-connector:1.2.0.RELEASE")
+	compile("io.pivotal.spring.cloud:spring-cloud-gemfire-spring-connector:1.2.0.RELEASE")
+
+	// Caching
+	//compile group: 'org.ehcache', name: 'ehcache', version: '3.5.2'
+	compile group: 'net.sf.ehcache', name: 'ehcache', version: '2.10.5'
+	compile group: 'javax.cache', name: 'cache-api'
+
+	// Rest Documentation
+	compile group: 'io.springfox', name: 'springfox-swagger2', version: '2.6.1'
+	compile group: 'io.springfox', name: 'springfox-swagger-ui', version: '2.6.1'
+
+	// Apache
+	compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.6'
+	compile group: 'org.apache.commons', name: 'commons-collections4', version: '4.1'
+	compile group: 'org.apache.commons', name: 'commons-csv', version: '1.5'
+	compile group: 'org.apache.commons', name: 'commons-text', version: '1.4'
+	compile(group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.3') {
+		exclude(module: 'commons-logging')
+	}
+
+	// Json library
+	compile group: 'com.google.guava', name: 'guava', version: '18.0'
+	compile group: 'net.sf.json-lib', name: 'json-lib', version: '2.4', classifier: 'jdk15'
+
+	// ESAPI validation
+	compile group: 'org.owasp.esapi', name: 'esapi', version: '2.1.0.1'
+
+	// DB
+	// DB2 Classic MBUSA
+	// compile group: 'com.ibm.db2.db2jcc4', name: 'db2jcc4', version: '9.7.5' 
+	compile group: 'org.postgresql', name: 'postgresql', version: '9.4-1206-jdbc41'
+
+	// Testing
+	testCompile('org.springframework.boot:spring-boot-starter-test')
+}
+
+/* ========================
+ * Task Configuration
+ * ========================
+ */
+
+test {
+	testLogging.showStandardStreams = true
+}
+
+versioning {
+	major = project.major
+	minor = project.minor
+}
+
+springBoot {
+	buildInfo {
+		// Generate extra build info.
+		additionalProperties = [
+				version : "${versioning.major}.${versioning.minor}",
+				revision : fullRevision,
+				buildDate : "${buildDate.format('dd-MM-yyyy HH:mm:ss')}",
+				aplicationName: project.name,
+				branch: branch
+		]
+	}
+}
+
+/* ========================
+ * Tasks
+ * ========================
+ */
+
+task wrapper(type: Wrapper) {
+	gradleVersion = '4.0.2'
+}
+ 
